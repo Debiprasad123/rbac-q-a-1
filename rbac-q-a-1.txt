@@ -1,0 +1,151 @@
+OrganisationController:
+------------------------
+1)public Organisation save(Organisation organisation) {
+
+		KeyHolder kh = new GeneratedKeyHolder();
+		MapSqlParameterSource source = new MapSqlParameterSource();
+		source.addValue("ON", organisation.getOrganisationName());
+		source.addValue("OS", organisation.getStatus());
+		template.update(QueryOrganisation.INSERT_ORG, source, kh);
+		organisation.setOrganisationId(kh.getKey().intValue());
+		return organisation;}
+		
+/* Explanation
+Input : Organisation Object as method parameter.
+mapParams: ON= gets OrganisationName  from Organisation object.
+           OS= gets OrganisationStatus from Organisation
+query: QueryOrganisation.INSERT_ORG. This contains two named parameters =:ON and =:OS.
+queryAction: It inserts Organisationname and organisationstatus  into TBL_FUNCTION table.
+return value: It will save the Organisation data and return the Organisation.
+*/
+
+2)public List<Role> getAssignedRolesById(Organisation org) {
+
+		MapSqlParameterSource source = new MapSqlParameterSource();
+		source.addValue("OI", org.getOrganisationId());
+		List<Role> roles = template.query(QueryOrganisation.GET_ASSIGNED_ROLE_BY_ID, source, new RoleRowMapper());
+		return roles;}
+		
+		/* Explanation
+Input : Organisation Object as method parameter.
+mapParams: OI= gets OrganisationId  from Organisation object.
+query: QueryOrganisation.GET_ASSIGNED_ROLE_BY_ID. This contains a named parameterd =:OI.
+queryAction: It retrieves records from TBL_ROLE table by  roleId where roleId is the roleId associated with the OrganisationId. That is joining two tables TBL_ROLE and and TBL_ORGANISATION.
+RowMapper: uses RoleRowMapper which contains logic to retrieve Role from resuletset.
+return value: roles.
+*/
+
+3)public List<Role> getNotAssignedRolesById(Organisation org) {
+
+		MapSqlParameterSource source = new MapSqlParameterSource();
+		source.addValue("OI", org.getOrganisationId());
+		List<Role> roles = template.query(QueryOrganisation.GET_NOT_ASSIGNED_ROLE_BY_ID, source, new RoleRowMapper());
+		return roles;
+	}
+		/* Explanation
+Input : Organisation Object as method parameter.
+mapParams: OI= gets OrganisationId  from Organisation object.
+query: QueryOrganisation.GET_NOT_ASSIGNED_ROLE_BY_ID. This contains a named parameterd =:OI.
+queryAction: It retrieves records from TBL_ROLE table which are not assigned  by  roleId where roleId is the roleId associated with the OrganisationId. That is joining two tables TBL_ROLE and and TBL_ORGANISATION.
+RoleRowMapper: uses RoleRowMapper which contains logic to retrieve Role from resuletset.
+return value: roles.
+*/
+
+4)public Organisation assignMoreRolesById(Organisation org) {
+		List<Role> roles = new ArrayList<Role>(org.getRoles());
+
+		List<Map<String, Object>> batchValues = new ArrayList<>(roles.size());
+		for (Role r : roles) {
+			batchValues.add(new MapSqlParameterSource("OI", org.getOrganisationId()).addValue("RI", r.getRoleId())
+					.addValue("STATUS", r.getStatus()).getValues());
+		}
+		template.batchUpdate(QueryOrganisation.INSERT_ORG_ROLE, batchValues.toArray(new Map[roles.size()]));
+		return findById(org);
+		
+/* Explanation
+Input : Organisation Object as method parameter.
+mapParams: OI= gets OrganisationId  from Organisation object.
+           RI= gets RoleId from Organisation object.
+		   STATUS=  gets Status from Organisation object. 
+query: QueryOrganisation.INSERT_ORG_ROLE. This contains three named parameters =:OI and =:RI and :STATUS.
+queryAction: It inserts ORGANISATION_ID,ROLE_ID,STATUS into table TBL_ORGANISATION_ROLE.
+return value: It will find Organisation data by Id.
+*/		
+
+5)public Organisation updateAssignedRoleStatusById(Organisation org) {
+
+		Map<String, Integer>[] maps = new HashMap[org.getRoles().size()];
+		int index = 0;
+		for (Role r : org.getRoles()) {
+			Map<String, Integer> dataMap = new HashMap<>();
+			dataMap.put("OI", org.getOrganisationId());
+			dataMap.put("RI", r.getRoleId());
+			dataMap.put("STATUS", r.getStatus());
+			maps[index] = dataMap;
+			index++;
+		}
+		if (maps.length > 0) {
+			int[] batchSize = template.batchUpdate(QueryOrganisation.UPDATE_STATUS_BY_ORG_ID_ROLE_ID, maps);
+		}
+		return findById(org);
+	};
+	
+	/* Explanation
+Input : Organisation Object as method parameter.
+mapParams: OI= gets OrganisationId  from Organisation object.
+           RI= gets RoleId from Organisation object.
+		   STATUS=  gets Status from Organisation object. 
+query: QueryOrganisation.UPDATE_STATUS_BY_ORG_ID_ROLE_ID. This contains three named parameters =:OI and =:RI and :STATUS.
+queryAction: It will update Status by organisationId,and roleId.
+return value: Organisation by id.
+*/		
+
+6)public Organisation findById(Organisation org) {
+
+		MapSqlParameterSource source = new MapSqlParameterSource();
+		source.addValue("OI", org.getOrganisationId());
+		org = template.queryForObject(QueryOrganisation.GET_ORG_BY_ID, source, new OrganisationRowMapper());
+		org.setRoles(new HashSet<>(getAssignedRolesById(org)));
+		return org;
+
+	}
+
+	/* Explanation
+Input : Organisation Object as method parameter.
+mapParams: OI= gets OrganisationId  from Organisation object.
+query: QueryOrganisation.GET_ORG_BY_ID. This contains a named parameters =:OI.
+queryAction: It will retrieve the data by organisationId.
+return value: Org.
+*/	
+
+7)public Organisation updateOrganisationNameAndStausById(Organisation org) {
+
+		MapSqlParameterSource source = new MapSqlParameterSource();
+		source.addValue("ON", org.getOrganisationName());
+		source.addValue("OS", org.getStatus());
+		source.addValue("OI", org.getOrganisationId());
+		template.update(QueryOrganisation.UPDATE_ORG, source);
+		return findById(org);
+		
+		
+	/* Explanation
+Input : Organisation Object as method parameter.
+mapParams:ON= gets OrganisationName  from Organisation object.
+ OS= gets Status from  Organisation object.
+ OI= gets OrganisationId  from Organisation object.
+query: QueryOrganisation.UPDATE_ORG,. This contains three named parameters =:ON,=OS,=OI.
+queryAction: It will update  the organisationNaame and OrganisationStatus  by organisationId.
+return value: Org by Org id.
+*/	
+		
+8)public List<Organisation> findAll() {
+		return template.query(QueryRole.SELECT_ALL, new OrganisationRowMapper());
+
+	}
+		
+	/* Explanation
+query: QueryRole.SELECT_ALL. queryAction: It will retrieve all data of TBL_ROLE.
+OrganisationRowMapper: It contains logic to retrieve Organisation from resuletset.
+return valu:List.
+*/	
+	
